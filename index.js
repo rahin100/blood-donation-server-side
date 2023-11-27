@@ -31,6 +31,35 @@ async function run() {
       .collection("all_districts");
     const allZillaCollection = client.db("blood-donation").collection("zilla");
 
+    const donationRequestCollection = client
+      .db("blood-donation")
+      .collection("donation-request");
+
+    //donation request collection
+    app.post("/dashboard/donation-request", async (req, res) => {
+      const user = req.body;
+      const result = await donationRequestCollection.insertOne(user);
+      res.send(result);
+    });
+
+    app.get("/dashboard/donation-request", async (req, res) => {
+      const query = req.query;
+      const cursor = donationRequestCollection.find(query);
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+    app.get("/dashboard/donation-request", async (req, res) => {
+      let query = {};
+      if (req.query?.requesterEmail) {
+        query = {
+          requesterEmail: req.query?.requesterEmail,
+        };
+      }
+      const cursor = donationRequestCollection.find(query);
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+
     //get districts
     app.get("/all_districts", async (req, res) => {
       const query = req.query;
