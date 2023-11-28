@@ -36,6 +36,7 @@ async function run() {
       .collection("donation-request");
 
     //donation request collection
+
     app.post("/dashboard/donation-request", async (req, res) => {
       const user = req.body;
       const result = await donationRequestCollection.insertOne(user);
@@ -59,6 +60,27 @@ async function run() {
       const result = await cursor.toArray();
       res.send(result);
     });
+
+    app.patch("/dashboard/donation-request/:id",async(req,res)=>{
+      const id = req.params.id;
+      const donationStatus  = req.body;
+      const filter = { _id: new ObjectId(id) };
+      console.log(donationStatus)
+
+      const updateStatus = {
+        $set: {
+          donationStatus: 'inprogress',
+        },
+      };
+
+      const result = await donationRequestCollection.updateOne(
+        filter,
+        updateStatus
+      );
+      res.send(result);
+
+
+    })
 
     //get districts
     app.get("/all_districts", async (req, res) => {
