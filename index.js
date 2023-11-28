@@ -36,7 +36,6 @@ async function run() {
       .collection("donation-request");
 
     //donation request collection
-
     app.post("/dashboard/donation-request", async (req, res) => {
       const user = req.body;
       const result = await donationRequestCollection.insertOne(user);
@@ -81,8 +80,52 @@ async function run() {
       );
       res.send(result);
     })
-    
 
+    app.put("/dashboard/donation-request/:id", async (req, res) => {
+      const id = req.params.id;
+      const updateDonation = req.body.donationRequestData;
+      const filter = { _id: new ObjectId(id) };
+      const options = { upsert: true };
+    
+      const updateDonations = {
+        $set: {
+          requesterName: updateDonation.requesterName,
+          requesterEmail: updateDonation.requesterEmail,
+          recipientName: updateDonation.recipientName,
+          recipientDistrict: updateDonation.recipientDistrict,
+          recipientUpazila: updateDonation.recipientUpazila,
+          recipentBloodGroup: updateDonation.recipentBloodGroup,
+          hospitalName: updateDonation.hospitalName,
+          fullAddress: updateDonation.fullAddress,
+          donationDate: updateDonation.donationDate,
+          donationTime: updateDonation.donationTime,
+          requestMessage: updateDonation.requestMessage,
+          donationStatus: "pending",
+        },
+      };
+    
+      try {
+        const result = await donationRequestCollection.updateOne(
+          filter,
+          updateDonations,
+          options
+        );
+        res.send(result);
+      } catch (error) {
+        console.error("Error updating donation:", error);
+        res.status(500).send({ error: "Internal Server Error" });
+      }
+    });
+
+    app.delete("/dashboard/donation-request/:id", async (req, res) => {
+      const id = req.params.id;
+      console.log(id);
+      const query = {
+        _id: new ObjectId(id),
+      };
+      const result = await donationRequestCollection.deleteOne(query);
+      res.send(result);
+    });
     
 
 
