@@ -63,13 +63,15 @@ async function run() {
 
     app.patch("/dashboard/donation-request/:id",async(req,res)=>{
       const id = req.params.id;
-      const donationStatus  = req.body;
+      const {donationStatus,donorName,donorEmail}  = req.body;
       const filter = { _id: new ObjectId(id) };
       console.log(donationStatus)
 
       const updateStatus = {
         $set: {
-          donationStatus: 'inprogress',
+          donationStatus: donationStatus,
+          donorName: donorName,
+          donorEmail: donorEmail
         },
       };
 
@@ -78,9 +80,12 @@ async function run() {
         updateStatus
       );
       res.send(result);
-
-
     })
+    
+
+    
+
+
 
     //get districts
     app.get("/all_districts", async (req, res) => {
