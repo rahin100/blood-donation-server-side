@@ -2,37 +2,38 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
-const jwt = require('jsonwebtoken');
+const jwt = require("jsonwebtoken");
 const cookieParser = require("cookie-parser");
 const app = express();
 const port = process.env.PORT || 5000;
 
 // middleware
-app.use(cors({
-  origin: 'http://localhost:5173', // This should be the origin of your client application
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: "http://localhost:5173", // This should be the origin of your client application
+    credentials: true,
+  })
+);
 app.use(express.json());
-app.use(cookieParser())
+app.use(cookieParser());
 
 const verifyToken = async (req, res, next) => {
-  const token = req.cookies?.token
-  console.log(token)
+  const token = req.cookies?.token;
+  console.log(token);
   if (!token) {
-    return res.status(401).send({ message: 'unauthorized access' })
+    return res.status(401).send({ message: "unauthorized access" });
   }
   jwt.verify(token, process.env.SECRET, (err, decoded) => {
-    console.log(token)
+    console.log(token);
     if (err) {
       console.log(err);
-      return res.status(401).send({ message: 'unauthorized access' });
+      return res.status(401).send({ message: "unauthorized access" });
     }
     // Token is valid, and decoded contains the payload
     req.user = decoded;
     next();
   });
-}
-
+};
 
 // connect to MongoDB
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.uv8wjkw.mongodb.net/?retryWrites=true&w=majority`;
@@ -59,24 +60,21 @@ async function run() {
       .db("blood-donation")
       .collection("donation-request");
 
-      // jwt 
-      app.post('/jwt', async (req, res) => {
-        const user = req.body
-        console.log('I need a new jwt', user)
-        const token = jwt.sign(user, process.env.SECRET, {
-          expiresIn: '365d',
+    // jwt
+    app.post("/jwt", async (req, res) => {
+      const user = req.body;
+      console.log("I need a new jwt", user);
+      const token = jwt.sign(user, process.env.SECRET, {
+        expiresIn: "365d",
+      });
+      res
+        .cookie("token", token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
         })
-        res
-          .cookie('token', token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
-          })
-          .send({ success: true })
-      })
-
-
-
+        .send({ success: true });
+    });
 
     //donation request collection
     app.post("/dashboard/donation-request", async (req, res) => {
@@ -247,7 +245,8 @@ async function run() {
       res.send(result);
     });
 
-    // admin related crud 
+    // admin related crud
+
     // blocked
     app.patch("/dashboard/all-users/:id", async (req, res) => {
       const id = req.params.id;
@@ -257,18 +256,15 @@ async function run() {
 
       const updateStatus = {
         $set: {
-          status:status
+          status: status,
         },
       };
 
-      const result = await userCollection.updateOne(
-        filter,
-        updateStatus
-      );
+      const result = await userCollection.updateOne(filter, updateStatus);
       res.send(result);
     });
 
-    // Active 
+    // Active
     app.patch("/dashboard/all-users/:id", async (req, res) => {
       const id = req.params.id;
       const { status } = req.body;
@@ -277,28 +273,25 @@ async function run() {
 
       const updateStatus = {
         $set: {
-          status:status
+          status: status,
         },
       };
 
-      const result = await userCollection.updateOne(
-        filter,
-        updateStatus
-      );
+      const result = await userCollection.updateOne(filter, updateStatus);
       res.send(result);
     });
 
-    //Make Volunteer 
+    //Make Volunteer
     app.put("/dashboard/all-users/:id", async (req, res) => {
       const id = req.params.id;
-      const {Role}  = req.body;
+      const { Role } = req.body;
       const filter = { _id: new ObjectId(id) };
       const options = { upsert: true };
       console.log(Role);
 
       const updateRole = {
         $set: {
-          Role:Role
+          Role: Role,
         },
       };
 
@@ -310,9 +303,65 @@ async function run() {
       res.send(result);
     });
 
+    //Make Donor to Admin
+    app.put("/dashboard/all-users/:id", async (req, res) => {
+      const id = req.params.id;
+      const { Role } = req.body;
+      const filter = { _id: new ObjectId(id) };
+      const options = { upsert: true };
+      console.log(Role);
+
+      const updateRole = {
+        $set: {
+          Role: Role,
+        },
+      };
+
+      const result = await userCollection.updateOne(
+        filter,
+        updateRole,
+        options
+      );
+      res.send(result);
+    });
+
+    //Make Volunteer to Admin
+    app.put("/dashboard/all-users/:id", async (req, res) => {
+      const id = req.params.id;
+      const { Role } = req.body;
+      const filter = { _id: new ObjectId(id) };
+      const options = { upsert: true };
+      console.log(Role);
+
+      const updateRole = {
+        $set: {
+          Role: Role,
+        },
+      };
+
+      const result = await userCollection.updateOne(
+        filter,
+        updateRole,
+        options
+      );
+      res.send(result);
+    });
+
+    app.get("/users/:email", async (req, res) => {
+      try {
+        const email = req.params.email;
     
-
-
+        const query = { email: email };
+        const user = await userCollection.findOne(query);
+        const admin = user?.Role === "Admin";
+        
+        res.send({ admin });
+      } catch (error) {
+        console.error("Error in /users/:email route:", error);
+        res.status(500).send({ error: "Internal Server Error" });
+      }
+    });
+    
 
     await client.db("admin").command({ ping: 1 });
     console.log(
