@@ -2,13 +2,37 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
-
+const jwt = require('jsonwebtoken');
+const cookieParser = require("cookie-parser");
 const app = express();
 const port = process.env.PORT || 5000;
 
 // middleware
-app.use(cors());
+app.use(cors({
+  origin: 'http://localhost:5173', // This should be the origin of your client application
+  credentials: true,
+}));
 app.use(express.json());
+app.use(cookieParser())
+
+const verifyToken = async (req, res, next) => {
+  const token = req.cookies?.token
+  console.log(token)
+  if (!token) {
+    return res.status(401).send({ message: 'unauthorized access' })
+  }
+  jwt.verify(token, process.env.SECRET, (err, decoded) => {
+    console.log(token)
+    if (err) {
+      console.log(err);
+      return res.status(401).send({ message: 'unauthorized access' });
+    }
+    // Token is valid, and decoded contains the payload
+    req.user = decoded;
+    next();
+  });
+}
+
 
 // connect to MongoDB
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.uv8wjkw.mongodb.net/?retryWrites=true&w=majority`;
@@ -35,6 +59,25 @@ async function run() {
       .db("blood-donation")
       .collection("donation-request");
 
+      // jwt 
+      app.post('/jwt', async (req, res) => {
+        const user = req.body
+        console.log('I need a new jwt', user)
+        const token = jwt.sign(user, process.env.SECRET, {
+          expiresIn: '365d',
+        })
+        res
+          .cookie('token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+          })
+          .send({ success: true })
+      })
+
+
+
+
     //donation request collection
     app.post("/dashboard/donation-request", async (req, res) => {
       const user = req.body;
@@ -60,17 +103,17 @@ async function run() {
       res.send(result);
     });
 
-    app.patch("/dashboard/donation-request/:id",async(req,res)=>{
+    app.patch("/dashboard/donation-request/:id", async (req, res) => {
       const id = req.params.id;
-      const {donationStatus,donorName,donorEmail}  = req.body;
+      const { donationStatus, donorName, donorEmail } = req.body;
       const filter = { _id: new ObjectId(id) };
-      console.log(donationStatus)
+      console.log(donationStatus);
 
       const updateStatus = {
         $set: {
           donationStatus: donationStatus,
           donorName: donorName,
-          donorEmail: donorEmail
+          donorEmail: donorEmail,
         },
       };
 
@@ -79,14 +122,14 @@ async function run() {
         updateStatus
       );
       res.send(result);
-    })
+    });
 
     app.put("/dashboard/donation-request/:id", async (req, res) => {
       const id = req.params.id;
       const updateDonation = req.body.donationRequestData;
       const filter = { _id: new ObjectId(id) };
       const options = { upsert: true };
-    
+
       const updateDonations = {
         $set: {
           requesterName: updateDonation.requesterName,
@@ -103,7 +146,7 @@ async function run() {
           donationStatus: "pending",
         },
       };
-    
+
       try {
         const result = await donationRequestCollection.updateOne(
           filter,
@@ -126,9 +169,6 @@ async function run() {
       const result = await donationRequestCollection.deleteOne(query);
       res.send(result);
     });
-    
-
-
 
     //get districts
     app.get("/all_districts", async (req, res) => {
@@ -206,6 +246,73 @@ async function run() {
       );
       res.send(result);
     });
+
+    // admin related crud 
+    // blocked
+    app.patch("/dashboard/all-users/:id", async (req, res) => {
+      const id = req.params.id;
+      const { status } = req.body;
+      const filter = { _id: new ObjectId(id) };
+      console.log(status);
+
+      const updateStatus = {
+        $set: {
+          status:status
+        },
+      };
+
+      const result = await userCollection.updateOne(
+        filter,
+        updateStatus
+      );
+      res.send(result);
+    });
+
+    // Active 
+    app.patch("/dashboard/all-users/:id", async (req, res) => {
+      const id = req.params.id;
+      const { status } = req.body;
+      const filter = { _id: new ObjectId(id) };
+      console.log(status);
+
+      const updateStatus = {
+        $set: {
+          status:status
+        },
+      };
+
+      const result = await userCollection.updateOne(
+        filter,
+        updateStatus
+      );
+      res.send(result);
+    });
+
+    //Make Volunteer 
+    app.put("/dashboard/all-users/:id", async (req, res) => {
+      const id = req.params.id;
+      const {Role}  = req.body;
+      const filter = { _id: new ObjectId(id) };
+      const options = { upsert: true };
+      console.log(Role);
+
+      const updateRole = {
+        $set: {
+          Role:Role
+        },
+      };
+
+      const result = await userCollection.updateOne(
+        filter,
+        updateRole,
+        options
+      );
+      res.send(result);
+    });
+
+    
+
+
 
     await client.db("admin").command({ ping: 1 });
     console.log(
