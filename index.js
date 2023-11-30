@@ -8,6 +8,42 @@ const app = express();
 const port = process.env.PORT || 5000;
 
 // middleware
+// const verifyToken = async (req, res, next) => {
+//   const token = req.cookies?.token;
+//   console.log(token);
+//   if (!token) {
+//     return res.status(401).send({ message: "unauthorized access" });
+//   }
+//   jwt.verify(token, process.env.ACCESS_TOKEN, (err, decoded) => {
+//     console.log(token);
+//     if (err) {
+//       console.log(err);
+//       return res.status(401).send({ message: "unauthorized access" });
+//     }
+//     console.log("value in the token", decoded);
+//     req.user = decoded;
+//     next();
+//   });
+// };
+const verifyToken = async (req, res, next) => {
+console.log("inside the verify token",req.headers.authorization)
+ if(!req.headers.authorization){
+  return res.status(401).send({ message: "unauthorized access" });
+ }
+ const token = req.headers.authorization.split(' ')[1]
+ jwt.verify(token, process.env.ACCESS_TOKEN, (err, decoded) => {
+      console.log(token);
+      if (err) {
+        console.log(err);
+        return res.status(401).send({ message: "unauthorized access" });
+      }
+      console.log("value in the token", decoded);
+      req.user = decoded;
+      next();
+    });
+};
+
+
 app.use(
   cors({
     origin: "http://localhost:5173", // This should be the origin of your client application
@@ -16,24 +52,6 @@ app.use(
 );
 app.use(express.json());
 app.use(cookieParser());
-
-const verifyToken = async (req, res, next) => {
-  const token = req.cookies?.token;
-  console.log(token);
-  if (!token) {
-    return res.status(401).send({ message: "unauthorized access" });
-  }
-  jwt.verify(token, process.env.SECRET, (err, decoded) => {
-    console.log(token);
-    if (err) {
-      console.log(err);
-      return res.status(401).send({ message: "unauthorized access" });
-    }
-    // Token is valid, and decoded contains the payload
-    req.user = decoded;
-    next();
-  });
-};
 
 // connect to MongoDB
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.uv8wjkw.mongodb.net/?retryWrites=true&w=majority`;
@@ -64,7 +82,7 @@ async function run() {
     app.post("/jwt", async (req, res) => {
       const user = req.body;
       console.log("I need a new jwt", user);
-      const token = jwt.sign(user, process.env.SECRET, {
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN, {
         expiresIn: "365d",
       });
       res
@@ -73,8 +91,9 @@ async function run() {
           secure: process.env.NODE_ENV === "production",
           sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
         })
-        .send({ success: true });
+        .send({ success: true, token });
     });
+
 
     //donation request collection
     app.post("/dashboard/donation-request", async (req, res) => {
@@ -192,7 +211,7 @@ async function run() {
     });
 
     // get user
-    app.get("/users", async (req, res) => {
+    app.get("/users",async (req, res) => {
       const query = req.query;
       const cursor = userCollection.find(query);
       const result = await cursor.toArray();
@@ -200,7 +219,7 @@ async function run() {
     });
 
     // profile route
-    app.get("/profile", async (req, res) => {
+    app.get("/profile",async (req, res) => {
       const { email } = req.query;
       const query = { email: email };
 
@@ -347,21 +366,20 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/users/:email", async (req, res) => {
+    app.get("/users/:email",verifyToken, async (req, res) => {
       try {
         const email = req.params.email;
-    
+
         const query = { email: email };
         const user = await userCollection.findOne(query);
         const admin = user?.Role === "Admin";
-        
+
         res.send({ admin });
       } catch (error) {
         console.error("Error in /users/:email route:", error);
         res.status(500).send({ error: "Internal Server Error" });
       }
     });
-    
 
     await client.db("admin").command({ ping: 1 });
     console.log(
