@@ -8,45 +8,27 @@ const app = express();
 const port = process.env.PORT || 5000;
 
 // middleware
-// const verifyToken = async (req, res, next) => {
-//   const token = req.cookies?.token;
-//   console.log(token);
-//   if (!token) {
-//     return res.status(401).send({ message: "unauthorized access" });
-//   }
-//   jwt.verify(token, process.env.ACCESS_TOKEN, (err, decoded) => {
-//     console.log(token);
-//     if (err) {
-//       console.log(err);
-//       return res.status(401).send({ message: "unauthorized access" });
-//     }
-//     console.log("value in the token", decoded);
-//     req.user = decoded;
-//     next();
-//   });
-// };
 const verifyToken = async (req, res, next) => {
-console.log("inside the verify token",req.headers.authorization)
- if(!req.headers.authorization){
-  return res.status(401).send({ message: "unauthorized access" });
- }
- const token = req.headers.authorization.split(' ')[1]
- jwt.verify(token, process.env.ACCESS_TOKEN, (err, decoded) => {
-      console.log(token);
-      if (err) {
-        console.log(err);
-        return res.status(401).send({ message: "unauthorized access" });
-      }
-      console.log("value in the token", decoded);
-      req.user = decoded;
-      next();
-    });
+  console.log("inside the verify token", req.headers.authorization);
+  if (!req.headers.authorization) {
+    return res.status(401).send({ message: "unauthorized access" });
+  }
+  const token = req.headers.authorization.split(" ")[1];
+  jwt.verify(token, process.env.ACCESS_TOKEN, (err, decoded) => {
+    console.log(token);
+    if (err) {
+      console.log(err);
+      return res.status(401).send({ message: "unauthorized access" });
+    }
+    console.log("value in the token", decoded);
+    req.user = decoded;
+    next();
+  });
 };
-
 
 app.use(
   cors({
-    origin: "http://localhost:5173", // This should be the origin of your client application
+    origin: "http://localhost:5173",
     credentials: true,
   })
 );
@@ -73,10 +55,12 @@ async function run() {
       .db("blood-donation")
       .collection("all_districts");
     const allZillaCollection = client.db("blood-donation").collection("zilla");
-
     const donationRequestCollection = client
       .db("blood-donation")
       .collection("donation-request");
+    const allBlogsCollection = client
+      .db("blood-donation")
+      .collection("all-blogs");
 
     // jwt
     app.post("/jwt", async (req, res) => {
@@ -94,6 +78,94 @@ async function run() {
         .send({ success: true, token });
     });
 
+    // blogs collection
+    app.post("/dashboard/all-blogs", async (req, res) => {
+      const user = req.body;
+      const result = await allBlogsCollection.insertOne(user);
+      res.send(result);
+    });
+
+    app.get("/dashboard/all-blogs", async (req, res) => {
+      const query = req.query;
+      const cursor = allBlogsCollection.find(query);
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+
+    //publish
+    app.patch("/dashboard/all-blogs/:id", async (req, res) => {
+      const id = req.params.id;
+      const { blog_status } = req.body;
+      const filter = { _id: new ObjectId(id) };
+      console.log(blog_status);
+
+      const updateStatus = {
+        $set: {
+          blog_status: blog_status,
+        },
+      };
+
+      const result = await allBlogsCollection.updateOne(filter, updateStatus);
+      res.send(result);
+    });
+    //Unpublish
+    app.patch("/dashboard/all-blogs/:id", async (req, res) => {
+      const id = req.params.id;
+      const { blog_status } = req.body;
+      const filter = { _id: new ObjectId(id) };
+      console.log(blog_status);
+
+      const updateStatus = {
+        $set: {
+          blog_status: blog_status,
+        },
+      };
+
+      const result = await allBlogsCollection.updateOne(filter, updateStatus);
+      res.send(result);
+    });
+    // update blog 
+    app.put("/dashboard/all-blogs/:id", async (req, res) => {
+      const id = req.params.id;
+      const updateBlog= req.body.updateBlog;
+      const filter = { _id: new ObjectId(id) };
+      const options = { upsert: true };
+      console.log(updateBlog)
+
+      const updateData = {
+        $set: {
+          title: updateBlog.title,
+          photo: updateBlog.photo,
+          content: updateBlog.content,
+          blog_status:"draft"
+        },
+      };
+
+      try {
+        const result = await allBlogsCollection.updateOne(
+          filter,
+          updateData,
+          options
+        );
+        res.send(result);
+      } catch (error) {
+        console.error("Error updating donation:", error);
+        res.status(500).send({ error: "Internal Server Error" });
+      }
+    });
+    
+
+
+    app.delete("/dashboard/all-blogs/:id", async (req, res) => {
+      const id = req.params.id;
+      console.log(id);
+      const query = {
+        _id: new ObjectId(id),
+      };
+      const result = await allBlogsCollection.deleteOne(query);
+      res.send(result);
+    });
+    
 
     //donation request collection
     app.post("/dashboard/donation-request", async (req, res) => {
@@ -211,7 +283,7 @@ async function run() {
     });
 
     // get user
-    app.get("/users",async (req, res) => {
+    app.get("/users", async (req, res) => {
       const query = req.query;
       const cursor = userCollection.find(query);
       const result = await cursor.toArray();
@@ -219,7 +291,7 @@ async function run() {
     });
 
     // profile route
-    app.get("/profile",async (req, res) => {
+    app.get("/profile", async (req, res) => {
       const { email } = req.query;
       const query = { email: email };
 
@@ -366,7 +438,7 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/users/:email",verifyToken, async (req, res) => {
+    app.get("/users/:email", verifyToken, async (req, res) => {
       try {
         const email = req.params.email;
 
