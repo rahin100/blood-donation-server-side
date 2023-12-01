@@ -4,6 +4,7 @@ require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const jwt = require("jsonwebtoken");
 const cookieParser = require("cookie-parser");
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
 const app = express();
 const port = process.env.PORT || 5000;
 
@@ -452,6 +453,48 @@ async function run() {
         res.status(500).send({ error: "Internal Server Error" });
       }
     });
+
+
+    // volunteer related crud
+    app.get("/users/volunteer/:email", verifyToken, async (req, res) => {
+      try {
+        const email = req.params.email;
+
+        const query = { email: email };
+        const user = await userCollection.findOne(query);
+        const volunteer = user?.Role === "Volunteer";
+
+        res.send({ volunteer });
+      } catch (error) {
+        console.error("Error in /users/:email route:", error);
+        res.status(500).send({ error: "Internal Server Error" });
+      }
+    });
+
+
+    //payment intent 
+    app.post("/create-payment-intent", async (req, res) => {
+      try {
+        const { price } = req.body;
+    
+        const amount = parseInt(price * 100);
+    
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: amount,
+          currency: "usd",
+          payment_method_types: ["card"],
+        });
+    
+        res.send({
+          clientSecret: paymentIntent.client_secret,
+        });
+      } catch (error) {
+        console.error("Error creating Payment Intent:", error);
+        res.status(500).send({ error: "Internal Server Error" });
+      }
+    });
+
+
 
     await client.db("admin").command({ ping: 1 });
     console.log(
