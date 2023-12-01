@@ -4,7 +4,7 @@ require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const jwt = require("jsonwebtoken");
 const cookieParser = require("cookie-parser");
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const app = express();
 const port = process.env.PORT || 5000;
 
@@ -62,6 +62,7 @@ async function run() {
     const allBlogsCollection = client
       .db("blood-donation")
       .collection("all-blogs");
+    const paymentCollection = client.db("blood-donation").collection("payment");
 
     // jwt
     app.post("/jwt", async (req, res) => {
@@ -125,20 +126,20 @@ async function run() {
       const result = await allBlogsCollection.updateOne(filter, updateStatus);
       res.send(result);
     });
-    // update blog 
+    // update blog
     app.put("/dashboard/all-blogs/:id", async (req, res) => {
       const id = req.params.id;
-      const updateBlog= req.body.updateBlog;
+      const updateBlog = req.body.updateBlog;
       const filter = { _id: new ObjectId(id) };
       const options = { upsert: true };
-      console.log(updateBlog)
+      console.log(updateBlog);
 
       const updateData = {
         $set: {
           title: updateBlog.title,
           photo: updateBlog.photo,
           content: updateBlog.content,
-          blog_status:"draft"
+          blog_status: "draft",
         },
       };
 
@@ -154,8 +155,6 @@ async function run() {
         res.status(500).send({ error: "Internal Server Error" });
       }
     });
-    
-
 
     app.delete("/dashboard/all-blogs/:id", async (req, res) => {
       const id = req.params.id;
@@ -166,7 +165,6 @@ async function run() {
       const result = await allBlogsCollection.deleteOne(query);
       res.send(result);
     });
-    
 
     //donation request collection
     app.post("/dashboard/donation-request", async (req, res) => {
@@ -454,7 +452,6 @@ async function run() {
       }
     });
 
-
     // volunteer related crud
     app.get("/users/volunteer/:email", verifyToken, async (req, res) => {
       try {
@@ -471,20 +468,19 @@ async function run() {
       }
     });
 
-
-    //payment intent 
+    //payment intent
     app.post("/create-payment-intent", async (req, res) => {
       try {
         const { price } = req.body;
-    
+
         const amount = parseInt(price * 100);
-    
+
         const paymentIntent = await stripe.paymentIntents.create({
           amount: amount,
           currency: "usd",
           payment_method_types: ["card"],
         });
-    
+
         res.send({
           clientSecret: paymentIntent.client_secret,
         });
@@ -494,7 +490,43 @@ async function run() {
       }
     });
 
+    // ... (your imports)
 
+    app.post("/payment", async (req, res) => {
+      try {
+        const paymentData = req.body;
+        const result = await paymentCollection.insertOne(paymentData);
+        res.send(result);
+      } catch (error) {
+        console.error("Error processing payment:", error);
+        res.status(500).send({ error: "Internal Server Error" });
+      }
+    });
+
+    app.get("/payment", async (req, res) => {
+      const query = req.query;
+      const cursor = paymentCollection.find(query);
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+
+    app.get("/payment", async (req, res) => {
+      const { email } = req.query;
+      const query = { email: email };
+
+      try {
+        const result = await paymentCollection.findOne(query);
+
+        if (result) {
+          res.json(result);
+        } else {
+          res.status(404).json({ error: "User not found" });
+        }
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Internal Server Error" });
+      }
+    });
 
     await client.db("admin").command({ ping: 1 });
     console.log(
