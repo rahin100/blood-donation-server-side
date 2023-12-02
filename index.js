@@ -29,10 +29,15 @@ const verifyToken = async (req, res, next) => {
 
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: [
+      'http://localhost:5173',
+      'https://blood-donation-react.web.app',
+      'https://blood-donation-react.firebaseapp.com',
+    ],
     credentials: true,
   })
 );
+
 app.use(express.json());
 app.use(cookieParser());
 
@@ -49,7 +54,7 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    await client.connect();
+    // await client.connect();
 
     const userCollection = client.db("blood-donation").collection("users");
     const allDistrictsCollection = client
@@ -179,6 +184,14 @@ async function run() {
       const result = await cursor.toArray();
       res.send(result);
     });
+
+    app.get("/donation-request", async (req, res) => {
+      const query = req.query;
+      const cursor = donationRequestCollection.find(query);
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+
     app.get("/dashboard/donation-request", async (req, res) => {
       let query = {};
       if (req.query?.requesterEmail) {
@@ -437,7 +450,7 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/users/:email", verifyToken, async (req, res) => {
+    app.get("/users/:email", async (req, res) => {
       try {
         const email = req.params.email;
 
@@ -453,7 +466,7 @@ async function run() {
     });
 
     // volunteer related crud
-    app.get("/users/volunteer/:email", verifyToken, async (req, res) => {
+    app.get("/users/volunteer/:email", async (req, res) => {
       try {
         const email = req.params.email;
 
@@ -489,8 +502,6 @@ async function run() {
         res.status(500).send({ error: "Internal Server Error" });
       }
     });
-
-    // ... (your imports)
 
     app.post("/payment", async (req, res) => {
       try {
@@ -528,7 +539,31 @@ async function run() {
       }
     });
 
-    await client.db("admin").command({ ping: 1 });
+    // admin-stats 
+    app.get("/admin-stats", async (req, res) => {
+      const totalUsers = await userCollection.estimatedDocumentCount()
+      const totalBloodDonationRequest = await donationRequestCollection.estimatedDocumentCount()
+
+      const result = await paymentCollection.aggregate([
+        {
+          $group:{
+            _id: null,
+            totalFund: {
+              $sum: '$price'
+            }
+          }
+        }
+      ]).toArray()
+      const totalFund = result.length > 0 ? result[0].totalFund : 0
+      res.send({
+        totalUsers,
+        totalBloodDonationRequest,
+        totalFund
+      })
+    });
+
+
+    // await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
